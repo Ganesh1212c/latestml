@@ -9,7 +9,6 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  FirebaseAuthError, // <-- IMPORTANT: Added FirebaseAuthError import
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase'; // Assumes './firebase' points to your firebase.ts
@@ -86,14 +85,14 @@ const handleGoogleSignInError = (error: any): never => { // : never indicates it
   let userFriendlyMessage = "An unexpected error occurred during Google Sign-In.";
   let documentationLink: string | null = null; // Prepare for potential documentation links
 
-  // Check if it's a Firebase Auth specific error
-  if (error instanceof FirebaseAuthError) {
+  // Check if it's a Firebase Auth specific error by checking for the code property
+  if (error && typeof error.code === 'string') {
     switch (error.code) {
       case 'auth/cancelled-popup-request':
       case 'auth/popup-closed-by-user':
         throw new Error(CustomAuthError.SignInCancelled);
       case 'auth/popup-blocked':
-        throw new new Error(CustomAuthError.PopupBlocked);
+        throw new Error(CustomAuthError.PopupBlocked);
       case 'auth/network-request-failed':
         throw new Error(CustomAuthError.NetworkFailed);
       case 'auth/operation-not-allowed':
