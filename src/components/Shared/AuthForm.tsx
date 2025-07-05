@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, BookOpen, Chrome } from 'lucide-react';
+import { Mail, Lock, User, BookOpen, Chrome, AlertCircle } from 'lucide-react';
 import Button from '../UI/Button';
 import Card from '../UI/Card';
 import { useAuth } from '../../hooks/useAuth';
@@ -16,6 +16,7 @@ interface AuthFormData {
 
 const AuthForm: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showPopupHelp, setShowPopupHelp] = useState(false);
   
   const { signIn, signInWithGoogle, signUp, loading } = useAuth();
   const { register, handleSubmit, formState: { errors }, reset } = useForm<AuthFormData>();
@@ -39,13 +40,19 @@ const AuthForm: React.FC = () => {
       await signInWithGoogle();
       toast.success('Welcome to MathLearn!');
     } catch (error: any) {
-      toast.error(error.message || 'Google sign-in failed');
+      if (error.message === 'POPUP_BLOCKED') {
+        setShowPopupHelp(true);
+        toast.error('Pop-up blocked! Please allow pop-ups for this site or try the alternative method below.');
+      } else {
+        toast.error(error.message || 'Google sign-in failed');
+      }
     }
   };
 
   const toggleMode = () => {
     setIsSignUp(!isSignUp);
     reset();
+    setShowPopupHelp(false);
   };
 
   return (
@@ -97,6 +104,34 @@ const AuthForm: React.FC = () => {
               >
                 Continue with Google
               </Button>
+              
+              {/* Popup Help Message */}
+              <AnimatePresence>
+                {showPopupHelp && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-3 p-3 bg-amber-900/20 border border-amber-600/30 rounded-lg"
+                  >
+                    <div className="flex items-start space-x-2">
+                      <AlertCircle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-amber-200">
+                        <p className="font-medium mb-1">Pop-up blocked?</p>
+                        <p className="text-amber-300/80">
+                          Please allow pop-ups for this site in your browser settings, or use email/password sign-in below.
+                        </p>
+                        <button
+                          onClick={() => setShowPopupHelp(false)}
+                          className="text-amber-400 hover:text-amber-300 text-xs mt-1 underline"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Divider */}

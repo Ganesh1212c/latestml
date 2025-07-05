@@ -6,7 +6,9 @@ import {
   User as FirebaseUser,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
@@ -57,14 +59,25 @@ export const signIn = async (email: string, password: string): Promise<User> => 
   }
 };
 
-export const signInWithGoogle = async (): Promise<User> => {
+export const signInWithGoogle = async (useRedirect: boolean = false): Promise<User> => {
   try {
     const provider = new GoogleAuthProvider();
     provider.addScope('email');
     provider.addScope('profile');
     
-    const result = await signInWithPopup(auth, provider);
-    const firebaseUser = result.user;
+    let result;
+    let firebaseUser: FirebaseUser;
+    
+    if (useRedirect) {
+      // Use redirect method as fallback
+      await signInWithRedirect(auth, provider);
+      // The actual result will be handled by checkRedirectResult
+      throw new Error('REDIRECT_IN_PROGRESS');
+    } else {
+      // Try popup method first
+      result = await signInWithPopup(auth, provider);
+      firebaseUser = result.user;
+    }
     
     // Check if user exists in Firestore
     const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
@@ -110,7 +123,72 @@ export const signInWithGoogle = async (): Promise<User> => {
     return userData;
   } catch (error: any) {
     console.error('Google sign in error:', error);
+    
+    // Handle specific popup blocked error
+    if (error.code === 'auth/popup-blocked') {
+      throw new Error('POPUP_BLOCKED');
+    }
+    
+    if (error.message === 'REDIRECT_IN_PROGRESS') {
+      throw error;
+    }
+    
     throw new Error(error.message || 'Failed to sign in with Google');
+  }
+};
+
+// Check for redirect result on app initialization
+export const checkRedirectResult = async (): Promise<User | null> => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result && result.user) {
+      const firebaseUser = result.user;
+      
+      // Check if user exists in Firestore
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      
+      let userData: User;
+      
+      if (!userDoc.exists()) {
+        // New user - create profile
+        userData = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          displayName: firebaseUser.displayName || '',
+          role: 'student',
+          photoURL: firebaseUser.photoURL || undefined,
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+          emailVerified: true,
+        };
+        
+        await setDoc(doc(db, 'users', firebaseUser.uid), userData);
+      } else {
+        // Existing user - update last login
+        const existingData = userDoc.data();
+        userData = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          displayName: firebaseUser.displayName || existingData.displayName || '',
+          role: existingData.role || 'student',
+          photoURL: firebaseUser.photoURL || existingData.photoURL || undefined,
+          createdAt: existingData.createdAt || new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+          emailVerified: true,
+        };
+        
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          lastLogin: new Date().toISOString(),
+          photoURL: firebaseUser.photoURL || existingData.photoURL
+        }, { merge: true });
+      }
+
+      return userData;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error checking redirect result:', error);
+    return null;
   }
 };
 
