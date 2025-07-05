@@ -102,8 +102,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, displayName: string, role: 'admin' | 'student' = 'student') => {
     setLoading(true);
     try {
-      const result = await authSignUp(email, password, displayName, role);
-      setUser(result.user);
+      // Create account but don't automatically sign in
+      await authSignUp(email, password, displayName, role);
+      // Don't set user state - let them sign in manually
     } catch (error) {
       console.error('Sign up error:', error);
       throw error;

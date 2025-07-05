@@ -254,6 +254,10 @@ export const signUp = async (
     // Save user data to Firestore
     await setDoc(doc(db, 'users', userCredential.user.uid), userData);
 
+    // Sign out the user immediately after account creation
+    // This forces them to sign in manually with their new credentials
+    await firebaseSignOut(auth);
+
     return { user: userData };
   } catch (error: any) {
     console.error('Sign up error:', error);
