@@ -18,4 +18,7 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
+// Configure auth settings for better Google Sign-In experience
+auth.useDeviceLanguage();
+
 export default app;

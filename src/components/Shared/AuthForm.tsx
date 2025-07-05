@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, BookOpen, Chrome, AlertCircle, ExternalLink, CheckCircle } from 'lucide-react';
+import { Mail, Lock, User, BookOpen, Chrome, AlertCircle, ExternalLink, CheckCircle, Settings } from 'lucide-react';
 import Button from '../UI/Button';
 import Card from '../UI/Card';
 import { useAuth } from '../../hooks/useAuth';
+import { AuthErrorType } from '../../services/auth';
 import toast from 'react-hot-toast';
 
 interface AuthFormData {
@@ -28,12 +29,10 @@ const AuthForm: React.FC = () => {
       if (isSignUp) {
         await signUp(data.email, data.password, data.displayName!, data.role || 'student');
         
-        // Show success message and redirect to login
         setSuccessEmail(data.email);
         setShowSuccessMessage(true);
         reset();
         
-        // Auto-switch to login after showing success message
         setTimeout(() => {
           setShowSuccessMessage(false);
           setIsSignUp(false);
@@ -53,15 +52,48 @@ const AuthForm: React.FC = () => {
       await signInWithGoogle();
       toast.success('Welcome to MathLearn!');
     } catch (error: any) {
-      if (error.message === 'POPUP_BLOCKED') {
-        toast.error('Pop-up blocked! Please allow pop-ups for this site or try the alternative method below.');
-      } else if (error.message.includes('not properly configured') || 
-                 error.message.includes('not authorized') ||
-                 error.message.includes('configuration error')) {
-        setShowConfigHelp(true);
-        toast.error('Google sign-in is not available. Please use email/password sign-in.');
-      } else {
-        toast.error(error.message || 'Google sign-in failed');
+      console.error('Google Sign-In Error:', error);
+      
+      switch (error.message) {
+        case AuthErrorType.POPUP_BLOCKED:
+          toast.error('Pop-up blocked! Please allow pop-ups for this site.');
+          break;
+        
+        case AuthErrorType.SIGN_IN_CANCELLED:
+          toast.error('Sign-in was cancelled. Please try again.');
+          break;
+        
+        case AuthErrorType.NETWORK_ERROR:
+          toast.error('Network error. Please check your connection and try again.');
+          break;
+        
+        case AuthErrorType.OPERATION_NOT_ALLOWED:
+          setShowConfigHelp(true);
+          toast.error('Google Sign-In is not enabled. Please contact support.');
+          break;
+        
+        case AuthErrorType.UNAUTHORIZED_DOMAIN:
+          setShowConfigHelp(true);
+          toast.error('This domain is not authorized for Google Sign-In.');
+          break;
+        
+        case AuthErrorType.CONFIGURATION_ERROR:
+          setShowConfigHelp(true);
+          toast.error('Google Sign-In configuration error. Please contact support.');
+          break;
+        
+        case AuthErrorType.ACCOUNT_EXISTS:
+          toast.error('An account with this email already exists. Please use your existing sign-in method.');
+          break;
+        
+        default:
+          if (error.message.includes(AuthErrorType.GENERIC_ERROR)) {
+            const actualError = error.message.replace(`${AuthErrorType.GENERIC_ERROR}: `, '');
+            toast.error(`Google Sign-In failed: ${actualError}`);
+          } else {
+            toast.error('Google Sign-In failed. Please try again or use email/password.');
+          }
+          break;
       }
     }
   };
@@ -190,34 +222,43 @@ const AuthForm: React.FC = () => {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="mt-3 p-3 bg-blue-900/20 border border-blue-600/30 rounded-lg"
+                        className="mt-3 p-4 bg-orange-900/20 border border-orange-600/30 rounded-lg"
                       >
-                        <div className="flex items-start space-x-2">
-                          <AlertCircle className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                          <div className="text-sm text-blue-200">
-                            <p className="font-medium mb-1">Google Sign-in Setup Required</p>
-                            <p className="text-blue-300/80 mb-2">
-                              To enable Google sign-in, the Firebase project needs to be configured with:
+                        <div className="flex items-start space-x-3">
+                          <Settings className="h-5 w-5 text-orange-400 mt-0.5 flex-shrink-0" />
+                          <div className="text-sm text-orange-200">
+                            <p className="font-medium mb-2">Google Cloud Setup Required</p>
+                            <p className="text-orange-300/80 mb-3">
+                              To enable Google Sign-In, please configure:
                             </p>
-                            <ul className="text-xs text-blue-300/70 space-y-1 mb-2">
-                              <li>• Google OAuth client ID</li>
-                              <li>• Authorized domains</li>
-                              <li>• Proper Firebase configuration</li>
+                            <ul className="text-xs text-orange-300/70 space-y-1 mb-3">
+                              <li>• Google Cloud Console OAuth 2.0 credentials</li>
+                              <li>• Firebase Authentication Google provider</li>
+                              <li>• Authorized domains in both platforms</li>
+                              <li>• Proper API keys and client IDs</li>
                             </ul>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-3">
                               <button
                                 onClick={() => setShowConfigHelp(false)}
-                                className="text-blue-400 hover:text-blue-300 text-xs underline"
+                                className="text-orange-400 hover:text-orange-300 text-xs underline"
                               >
                                 Dismiss
                               </button>
                               <a
-                                href="https://firebase.google.com/docs/auth/web/google-signin"
+                                href="https://console.cloud.google.com/apis/credentials"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-400 hover:text-blue-300 text-xs underline flex items-center"
+                                className="text-orange-400 hover:text-orange-300 text-xs underline flex items-center"
                               >
-                                Setup Guide <ExternalLink className="h-3 w-3 ml-1" />
+                                Google Cloud Console <ExternalLink className="h-3 w-3 ml-1" />
+                              </a>
+                              <a
+                                href="https://console.firebase.google.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-orange-400 hover:text-orange-300 text-xs underline flex items-center"
+                              >
+                                Firebase Console <ExternalLink className="h-3 w-3 ml-1" />
                               </a>
                             </div>
                           </div>
@@ -332,16 +373,16 @@ const AuthForm: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Additional Info for Sign Up */}
+                {/* Google Cloud Setup Info */}
                 {isSignUp && (
                   <div className="mt-6 p-4 bg-dark-700 rounded-lg">
                     <div className="text-sm text-dark-300">
-                      <p className="font-medium text-white mb-2">Quick Setup:</p>
+                      <p className="font-medium text-white mb-2">Authentication Options:</p>
                       <ul className="space-y-1">
-                        <li>• No email verification required</li>
+                        <li>• Email/Password authentication</li>
+                        <li>• Google Cloud Sign-In (when configured)</li>
                         <li>• Instant account creation</li>
-                        <li>• Choose your account type</li>
-                        <li>• Sign in immediately after creation</li>
+                        <li>• Secure Firebase authentication</li>
                       </ul>
                     </div>
                   </div>
