@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, BookOpen, Chrome, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, BookOpen, Chrome, AlertCircle, ExternalLink } from 'lucide-react';
 import Button from '../UI/Button';
 import Card from '../UI/Card';
 import { useAuth } from '../../hooks/useAuth';
@@ -16,7 +16,7 @@ interface AuthFormData {
 
 const AuthForm: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
-  const [showPopupHelp, setShowPopupHelp] = useState(false);
+  const [showConfigHelp, setShowConfigHelp] = useState(false);
   
   const { signIn, signInWithGoogle, signUp, loading } = useAuth();
   const { register, handleSubmit, formState: { errors }, reset } = useForm<AuthFormData>();
@@ -41,8 +41,12 @@ const AuthForm: React.FC = () => {
       toast.success('Welcome to MathLearn!');
     } catch (error: any) {
       if (error.message === 'POPUP_BLOCKED') {
-        setShowPopupHelp(true);
         toast.error('Pop-up blocked! Please allow pop-ups for this site or try the alternative method below.');
+      } else if (error.message.includes('not properly configured') || 
+                 error.message.includes('not authorized') ||
+                 error.message.includes('configuration error')) {
+        setShowConfigHelp(true);
+        toast.error('Google sign-in is not available. Please use email/password sign-in.');
       } else {
         toast.error(error.message || 'Google sign-in failed');
       }
@@ -52,7 +56,7 @@ const AuthForm: React.FC = () => {
   const toggleMode = () => {
     setIsSignUp(!isSignUp);
     reset();
-    setShowPopupHelp(false);
+    setShowConfigHelp(false);
   };
 
   return (
@@ -105,28 +109,43 @@ const AuthForm: React.FC = () => {
                 Continue with Google
               </Button>
               
-              {/* Popup Help Message */}
+              {/* Configuration Help Message */}
               <AnimatePresence>
-                {showPopupHelp && (
+                {showConfigHelp && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="mt-3 p-3 bg-amber-900/20 border border-amber-600/30 rounded-lg"
+                    className="mt-3 p-3 bg-blue-900/20 border border-blue-600/30 rounded-lg"
                   >
                     <div className="flex items-start space-x-2">
-                      <AlertCircle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                      <div className="text-sm text-amber-200">
-                        <p className="font-medium mb-1">Pop-up blocked?</p>
-                        <p className="text-amber-300/80">
-                          Please allow pop-ups for this site in your browser settings, or use email/password sign-in below.
+                      <AlertCircle className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-blue-200">
+                        <p className="font-medium mb-1">Google Sign-in Setup Required</p>
+                        <p className="text-blue-300/80 mb-2">
+                          To enable Google sign-in, the Firebase project needs to be configured with:
                         </p>
-                        <button
-                          onClick={() => setShowPopupHelp(false)}
-                          className="text-amber-400 hover:text-amber-300 text-xs mt-1 underline"
-                        >
-                          Dismiss
-                        </button>
+                        <ul className="text-xs text-blue-300/70 space-y-1 mb-2">
+                          <li>• Google OAuth client ID</li>
+                          <li>• Authorized domains</li>
+                          <li>• Proper Firebase configuration</li>
+                        </ul>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => setShowConfigHelp(false)}
+                            className="text-blue-400 hover:text-blue-300 text-xs underline"
+                          >
+                            Dismiss
+                          </button>
+                          <a
+                            href="https://firebase.google.com/docs/auth/web/google-signin"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:text-blue-300 text-xs underline flex items-center"
+                          >
+                            Setup Guide <ExternalLink className="h-3 w-3 ml-1" />
+                          </a>
+                        </div>
                       </div>
                     </div>
                   </motion.div>

@@ -62,8 +62,16 @@ export const signIn = async (email: string, password: string): Promise<User> => 
 export const signInWithGoogle = async (useRedirect: boolean = false): Promise<User> => {
   try {
     const provider = new GoogleAuthProvider();
+    
+    // Configure the provider with proper scopes and parameters
     provider.addScope('email');
     provider.addScope('profile');
+    
+    // Set custom parameters to ensure proper OAuth flow
+    provider.setCustomParameters({
+      prompt: 'select_account',
+      access_type: 'online'
+    });
     
     let result;
     let firebaseUser: FirebaseUser;
@@ -75,8 +83,22 @@ export const signInWithGoogle = async (useRedirect: boolean = false): Promise<Us
       throw new Error('REDIRECT_IN_PROGRESS');
     } else {
       // Try popup method first
-      result = await signInWithPopup(auth, provider);
-      firebaseUser = result.user;
+      try {
+        result = await signInWithPopup(auth, provider);
+        firebaseUser = result.user;
+      } catch (popupError: any) {
+        // Handle specific popup errors
+        if (popupError.code === 'auth/popup-blocked') {
+          throw new Error('POPUP_BLOCKED');
+        } else if (popupError.code === 'auth/popup-closed-by-user') {
+          throw new Error('Sign-in was cancelled. Please try again.');
+        } else if (popupError.code === 'auth/unauthorized-domain') {
+          throw new Error('This domain is not authorized for Google sign-in. Please contact support.');
+        } else if (popupError.code === 'auth/invalid-api-key') {
+          throw new Error('Google sign-in is not properly configured. Please contact support.');
+        }
+        throw popupError;
+      }
     }
     
     // Check if user exists in Firestore
@@ -124,13 +146,26 @@ export const signInWithGoogle = async (useRedirect: boolean = false): Promise<Us
   } catch (error: any) {
     console.error('Google sign in error:', error);
     
-    // Handle specific popup blocked error
+    // Handle specific Firebase Auth errors
     if (error.code === 'auth/popup-blocked') {
       throw new Error('POPUP_BLOCKED');
+    } else if (error.code === 'auth/unauthorized-domain') {
+      throw new Error('This domain is not authorized for Google sign-in. Please add your domain to the Firebase Console.');
+    } else if (error.code === 'auth/invalid-api-key') {
+      throw new Error('Google sign-in configuration error. Please check your Firebase settings.');
+    } else if (error.code === 'auth/operation-not-allowed') {
+      throw new Error('Google sign-in is not enabled. Please enable it in the Firebase Console.');
+    } else if (error.code === 'auth/invalid-oauth-client-id') {
+      throw new Error('Invalid Google OAuth client ID. Please check your Firebase configuration.');
     }
     
     if (error.message === 'REDIRECT_IN_PROGRESS') {
       throw error;
+    }
+    
+    // For any other errors, provide a helpful message
+    if (error.message.includes('request access is invalid')) {
+      throw new Error('Google sign-in is not properly configured. Please contact support or try email/password sign-in.');
     }
     
     throw new Error(error.message || 'Failed to sign in with Google');
