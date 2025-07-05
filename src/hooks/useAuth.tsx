@@ -5,18 +5,16 @@ import {
   signUp as authSignUp, 
   signOut as authSignOut, 
   onAuthStateChange,
-  resendVerificationEmail as authResendVerification,
-  checkEmailVerification as authCheckVerification
+  signInWithGoogle as authSignInWithGoogle
 } from '../services/auth';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string, role?: 'admin' | 'student') => Promise<{ needsVerification: boolean }>;
+  signInWithGoogle: () => Promise<void>;
+  signUp: (email: string, password: string, displayName: string, role?: 'admin' | 'student') => Promise<void>;
   signOut: () => Promise<void>;
-  resendVerificationEmail: () => Promise<void>;
-  checkEmailVerification: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -48,12 +46,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const signInWithGoogle = async () => {
+    setLoading(true);
+    try {
+      const userData = await authSignInWithGoogle();
+      setUser(userData);
+    } catch (error) {
+      console.error('Google sign in error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const signUp = async (email: string, password: string, displayName: string, role: 'admin' | 'student' = 'student') => {
     setLoading(true);
     try {
       const result = await authSignUp(email, password, displayName, role);
-      // Don't set user here since they need to verify email first
-      return { needsVerification: result.needsVerification };
+      setUser(result.user);
     } catch (error) {
       console.error('Sign up error:', error);
       throw error;
@@ -75,33 +85,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const resendVerificationEmail = async () => {
-    try {
-      await authResendVerification();
-    } catch (error) {
-      console.error('Resend verification error:', error);
-      throw error;
-    }
-  };
-
-  const checkEmailVerification = async () => {
-    try {
-      return await authCheckVerification();
-    } catch (error) {
-      console.error('Check verification error:', error);
-      return false;
-    }
-  };
-
   return (
     <AuthContext.Provider value={{ 
       user, 
       loading, 
       signIn, 
+      signInWithGoogle,
       signUp, 
-      signOut, 
-      resendVerificationEmail,
-      checkEmailVerification
+      signOut
     }}>
       {children}
     </AuthContext.Provider>
