@@ -5,8 +5,7 @@ import {
   signUp as authSignUp, 
   signOut as authSignOut, 
   onAuthStateChange,
-  signInWithGoogle as authSignInWithGoogle,
-  checkRedirectResult
+  signInWithGoogle as authSignInWithGoogle
 } from '../services/auth';
 
 interface AuthContextType {
@@ -25,34 +24,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for redirect result first (for Google sign-in fallback)
-    const handleRedirectResult = async () => {
-      try {
-        const redirectUser = await checkRedirectResult();
-        if (redirectUser) {
-          setUser(redirectUser);
-          setLoading(false);
-          return;
-        }
-      } catch (error) {
-        console.error('Error handling redirect result:', error);
-      }
-      
-      // Set up real-time auth state listener
-      const unsubscribe = onAuthStateChange((user) => {
-        setUser(user);
-        setLoading(false);
-      });
+    // Set up real-time auth state listener
+    const unsubscribe = onAuthStateChange((user) => {
+      setUser(user);
+      setLoading(false);
+    });
 
-      return unsubscribe;
-    };
-
-    const unsubscribe = handleRedirectResult();
-    return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
-    };
+    return unsubscribe;
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -71,40 +49,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signInWithGoogle = async () => {
     setLoading(true);
     try {
-      // First try popup method
-      const userData = await authSignInWithGoogle(false);
+      const userData = await authSignInWithGoogle();
       setUser(userData);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Google sign in error:', error);
-      
-      // If popup is blocked, try redirect method
-      if (error.message === 'POPUP_BLOCKED') {
-        try {
-          await authSignInWithGoogle(true);
-          // Don't set loading to false here as redirect will reload the page
-          return;
-        } catch (redirectError: any) {
-          if (redirectError.message !== 'REDIRECT_IN_PROGRESS') {
-            setLoading(false);
-            throw new Error('Google sign-in failed. Please try again or use email/password.');
-          }
-          // If redirect is in progress, don't set loading to false
-          return;
-        }
-      }
-      
-      setLoading(false);
       throw error;
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const signUp = async (email: string, password: string, displayName: string, role: 'admin' | 'student' = 'student') => {
     setLoading(true);
     try {
-      // Create account but don't automatically sign in
-      await authSignUp(email, password, displayName, role);
-      // Don't set user state - let them sign in manually
+      const result = await authSignUp(email, password, displayName, role);
+      setUser(result.user);
     } catch (error) {
       console.error('Sign up error:', error);
       throw error;
